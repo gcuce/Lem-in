@@ -99,8 +99,19 @@ func (g *Graph) FindNonOverlappingPaths() []Path {
 	return selectedPaths
 }
 
-// printPathLevels prints the levels of paths taken by the ants
 func printPathLevels(paths []Path, antCount int) {
+	if len(paths) == 0 {
+		fmt.Println("Başlangıç ve bitiş noktası arasında yol bulunamadı.")
+		return
+	}
+
+	// Karıncaların takip edeceği yolları antPaths dizisine atar
+	antPaths := make([][]string, antCount)
+	for i := 0; i < antCount; i++ {
+		antPaths[i] = paths[i%len(paths)].Steps
+	}
+
+	// En uzun yolun uzunluğunu hesapla
 	maxPathLength := 0
 	for _, path := range paths {
 		if len(path.Steps) > maxPathLength {
@@ -108,18 +119,80 @@ func printPathLevels(paths []Path, antCount int) {
 		}
 	}
 
-	antPositions := make([]string, antCount)
-	for step := 0; step < maxPathLength+antCount-1; step++ {
-		movement := []string{}
-		for ant := 0; ant < antCount; ant++ {
-			pathIdx := ant % len(paths)
-			if step-ant >= 0 && step-ant < len(paths[pathIdx].Steps)-1 { // Skip the start room
-				antPositions[ant] = paths[pathIdx].Steps[step-ant+1]
-				movement = append(movement, fmt.Sprintf("L%d-%s", ant+1, antPositions[ant]))
+	// Karıncaların pozisyonlarını, adım sayılarını ve düğüm işgal durumlarını tutan diziler oluştur
+	antPositions := make([]int, antCount)
+	nodeOccupied := make(map[string]bool)
+	antSteps := make([]int, antCount) // Karıncaların attığı adım sayısını takip eder
+
+	// Başlangıçta tüm karıncaların pozisyonlarını ve adım sayılarını başlat
+	for i := 0; i < antCount; i++ {
+		antPositions[i] = 1
+		antSteps[i] = 1
+	}
+
+	round := 1 // Mevcut turu takip eder
+
+	// Başlangıç düğümünden çıkan bağlantı sayısını belirler
+	startNodeConnections := len(paths)
+
+	// Tüm karıncalar bitiş düğümüne ulaşana kadar simülasyonu döngüde tut
+	for {
+		allAntsFinished := true // Tüm karıncaların bitip bitmediğini kontrol eder
+		roundOutput := []string{}
+
+		// Her turda başlangıç düğümünden hareket eden karıncaların sayısını sınırla
+		antsMovingFromStart := 0
+
+		// Her karınca için hareketi kontrol eder
+		for i := 0; i < antCount; i++ {
+			// Eğer karınca bitiş düğümüne ulaştıysa devam et
+			if antPositions[i] >= len(antPaths[i]) {
+				continue // Eğer bu karınca bitiş düğümüne ulaşmışsa atla
+			}
+
+			// Karınca adımlarını en uzun yola göre kontrol et
+			if antSteps[i] < maxPathLength {
+				nextNode := antPaths[i][antPositions[i]] // Karıncanın gideceği bir sonraki düğüm
+
+				// Bir önceki düğümün artık boş olduğunu belirt
+				if antPositions[i] > 1 && antPositions[i]-1 < len(antPaths[i]) {
+					nodeOccupied[antPaths[i][antPositions[i]-1]] = false
+				}
+
+				// Başlangıç düğümünden çıkan karıncaların sayısını sınırla
+				if antPositions[i] == 1 {
+					if antsMovingFromStart >= startNodeConnections {
+						continue // Eğer sınır aşıldıysa bu karıncayı atla
+					}
+					antsMovingFromStart++
+				}
+
+				// Eğer düğüm işgal edilmemişse veya bitiş düğümüyse karıncayı hareket ettir
+				if !nodeOccupied[nextNode] || nextNode == antPaths[i][len(antPaths[i])-1] {
+					roundOutput = append(roundOutput, fmt.Sprintf("L%d-%s", i+1, nextNode))
+					nodeOccupied[nextNode] = true
+					antPositions[i]++ // Karıncayı bir sonraki düğüme taşı
+					antSteps[i]++     // Karıncanın adım sayısını arttır
+				}
+
+				// Eğer karınca henüz yolunu tamamlamadıysa
+				if antPositions[i] < len(antPaths[i]) {
+					allAntsFinished = false // En az bir karınca hala hareket ediyor
+				}
+			} else {
+				allAntsFinished = false // Bu karınca diğerlerini bekliyor
 			}
 		}
-		if len(movement) > 0 {
-			fmt.Println(strings.Join(movement, " "))
+
+		// Her turun çıktısını yazdır
+		if len(roundOutput) > 0 {
+			fmt.Println(strings.Join(roundOutput, " "))
+		}
+		round++
+
+		// Eğer tüm karıncalar bitiş düğümüne ulaştıysa döngüden çık
+		if allAntsFinished {
+			break // Tüm karıncalar yollarını tamamladı
 		}
 	}
 }

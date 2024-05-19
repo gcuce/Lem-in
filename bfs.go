@@ -1,5 +1,8 @@
 package main
 
+
+
+// bfs fonksiyonu, genişlik öncelikli arama algoritması ile başlangıç ve bitiş düğümleri arasındaki en kısa yolu bulur
 func bfs(capacity map[string]map[string]int, tunnels map[string][]string, start, end string) []string {
 	visited := make(map[string]bool)
 	parent := make(map[string]string)
