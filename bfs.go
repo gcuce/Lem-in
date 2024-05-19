@@ -1,33 +1,30 @@
 package main
 
-
-
-// bfs fonksiyonu, genişlik öncelikli arama algoritması ile başlangıç ve bitiş düğümleri arasındaki en kısa yolu bulur
-func bfs(capacity map[string]map[string]int, tunnels map[string][]string, start, end string) []string {
-	visited := make(map[string]bool)
-	parent := make(map[string]string)
-	queue := []string{start}
+// dfs function finds all paths between start and end nodes using depth-first search algorithm
+func dfs(capacity map[string]map[string]int, tunnels map[string][]string, start, end string, visited map[string]bool, path []string, paths *[][]string) {
+	// Mark the current node as visited
 	visited[start] = true
 
-	for len(queue) > 0 {
-		u := queue[0]
-		queue = queue[1:]
-		for _, v := range tunnels[u] {
-			if !visited[v] && capacity[u][v] > 0 {
-				queue = append(queue, v)
-				visited[v] = true
-				parent[v] = u
-				if v == end {
-					var path []string
-					for v != start {
-						path = append([]string{v}, path...)
-						v = parent[v]
-					}
-					path = append([]string{start}, path...)
-					return path
-				}
+	// Update the path
+	path = append(path, start)
+
+	// If the end node is reached, copy and append the found path to paths slice
+	if start == end {
+		newPath := make([]string, len(path))
+		copy(newPath, path)
+		*paths = append(*paths, newPath)
+	} else {
+		// If the end node is not reached yet, visit the neighboring nodes
+		for _, neighbor := range tunnels[start] {
+			if !visited[neighbor] && capacity[start][neighbor] > 0 {
+				dfs(capacity, tunnels, neighbor, end, visited, path, paths)
 			}
 		}
 	}
-	return nil
+
+	// Unmark the current node as visited
+	delete(visited, start)
+
+	// Update the path: backtrack
+	path = path[:len(path)-1]
 }

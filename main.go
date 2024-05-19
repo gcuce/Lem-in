@@ -30,13 +30,14 @@ func main() {
 	// Print the graph
 	fmt.Println("Graph:", graph)
 
-
-
 	// Find all paths
 	allPaths := graph.FindAllPaths(startRoom.Name, endRoom.Name)
+	fmt.Println("All Paths:")
+	for _, path := range allPaths {
+		fmt.Println(path)
+	}
 
-	fmt.Printf("AllPaths:%s", allPaths)
-	fmt.Println()
+	// Find non-overlapping paths
 	paths := graph.FindNonOverlappingPaths()
 	fmt.Println("Non-overlapping paths:")
 	for _, path := range paths {
@@ -45,5 +46,4 @@ func main() {
 
 	// Print the path levels
 	printPathLevels(paths, antCount)
-
 }

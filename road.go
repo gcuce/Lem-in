@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"strings"
 )
 
@@ -31,29 +30,12 @@ func min(a, b int) int {
 	return b
 }
 
-// FindAllPaths finds all paths from start to end using a modified Edmonds-Karp approach
-func (g *Graph) FindAllPaths(start, end string) []Path {
-	var paths []Path
+// FindAllPaths finds all paths between start and end nodes
+func (g *Graph) FindAllPaths(start, end string) [][]string {
+	var paths [][]string
 	residualGraph := copyGraph(g.Capacity)
-	for {
-		path := bfs(residualGraph, g.Tunnels, start, end)
-		if path == nil {
-			break
-		}
-		paths = append(paths, Path{Steps: path})
-		flow := math.MaxInt32
-		for i := 0; i < len(path)-1; i++ {
-			u := path[i]
-			v := path[i+1]
-			flow = min(flow, residualGraph[u][v])
-		}
-		for i := 0; i < len(path)-1; i++ {
-			u := path[i]
-			v := path[i+1]
-			residualGraph[u][v] -= flow
-			residualGraph[v][u] += flow
-		}
-	}
+	visited := make(map[string]bool)
+	dfs(residualGraph, g.Tunnels, start, end, visited, []string{}, &paths)
 	return paths
 }
 
@@ -65,7 +47,7 @@ func (g *Graph) FindNonOverlappingPaths() []Path {
 
 	for _, path := range allPaths {
 		conflict := false
-		for _, room := range path.Steps {
+		for _, room := range path {
 			if room == g.Start || room == g.End {
 				continue
 			}
@@ -75,8 +57,8 @@ func (g *Graph) FindNonOverlappingPaths() []Path {
 			}
 		}
 		if !conflict {
-			selectedPaths = append(selectedPaths, path)
-			for _, room := range path.Steps {
+			selectedPaths = append(selectedPaths, Path{Steps: path})
+			for _, room := range path {
 				if room == g.Start || room == g.End {
 					continue
 				}
@@ -105,13 +87,13 @@ func printPathLevels(paths []Path, antCount int) {
 		return
 	}
 
-	// Karıncaların takip edeceği yolları antPaths dizisine atar
+	// Assign paths for ants to follow to antPaths slice
 	antPaths := make([][]string, antCount)
 	for i := 0; i < antCount; i++ {
 		antPaths[i] = paths[i%len(paths)].Steps
 	}
 
-	// En uzun yolun uzunluğunu hesapla
+	// Calculate the length of the longest path
 	maxPathLength := 0
 	for _, path := range paths {
 		if len(path.Steps) > maxPathLength {
@@ -119,80 +101,79 @@ func printPathLevels(paths []Path, antCount int) {
 		}
 	}
 
-	// Karıncaların pozisyonlarını, adım sayılarını ve düğüm işgal durumlarını tutan diziler oluştur
+	// Arrays to keep track of ant positions, step counts, and node occupancy
 	antPositions := make([]int, antCount)
 	nodeOccupied := make(map[string]bool)
-	antSteps := make([]int, antCount) // Karıncaların attığı adım sayısını takip eder
+	antSteps := make([]int, antCount)
 
-	// Başlangıçta tüm karıncaların pozisyonlarını ve adım sayılarını başlat
+	// Initialize ant positions and step counts at the beginning
 	for i := 0; i < antCount; i++ {
 		antPositions[i] = 1
 		antSteps[i] = 1
 	}
 
-	round := 1 // Mevcut turu takip eder
+	round := 1 // Track the current round
 
-	// Başlangıç düğümünden çıkan bağlantı sayısını belirler
+	// Determine the number of connections leaving the start node
 	startNodeConnections := len(paths)
 
-	// Tüm karıncalar bitiş düğümüne ulaşana kadar simülasyonu döngüde tut
+	// Keep the simulation loop until all ants reach the end node
 	for {
-		allAntsFinished := true // Tüm karıncaların bitip bitmediğini kontrol eder
+		allAntsFinished := true // Check if all ants have finished
 		roundOutput := []string{}
 
-		// Her turda başlangıç düğümünden hareket eden karıncaların sayısını sınırla
 		antsMovingFromStart := 0
 
-		// Her karınca için hareketi kontrol eder
+		// Check the movement for each ant
 		for i := 0; i < antCount; i++ {
-			// Eğer karınca bitiş düğümüne ulaştıysa devam et
+			// Skip if ant reached the end node
 			if antPositions[i] >= len(antPaths[i]) {
-				continue // Eğer bu karınca bitiş düğümüne ulaşmışsa atla
+				continue
 			}
 
-			// Karınca adımlarını en uzun yola göre kontrol et
+			// Check ant movements according to the longest path
 			if antSteps[i] < maxPathLength {
-				nextNode := antPaths[i][antPositions[i]] // Karıncanın gideceği bir sonraki düğüm
+				nextNode := antPaths[i][antPositions[i]] // Next node for the ant
 
-				// Bir önceki düğümün artık boş olduğunu belirt
+				// Mark the previous node as unoccupied
 				if antPositions[i] > 1 && antPositions[i]-1 < len(antPaths[i]) {
 					nodeOccupied[antPaths[i][antPositions[i]-1]] = false
 				}
 
-				// Başlangıç düğümünden çıkan karıncaların sayısını sınırla
+				// Limit ants moving from the start node in each round
 				if antPositions[i] == 1 {
 					if antsMovingFromStart >= startNodeConnections {
-						continue // Eğer sınır aşıldıysa bu karıncayı atla
+						continue // Skip this ant if the limit is reached
 					}
 					antsMovingFromStart++
 				}
 
-				// Eğer düğüm işgal edilmemişse veya bitiş düğümüyse karıncayı hareket ettir
+				// Move the ant if the node is unoccupied or it's the end node
 				if !nodeOccupied[nextNode] || nextNode == antPaths[i][len(antPaths[i])-1] {
 					roundOutput = append(roundOutput, fmt.Sprintf("L%d-%s", i+1, nextNode))
 					nodeOccupied[nextNode] = true
-					antPositions[i]++ // Karıncayı bir sonraki düğüme taşı
-					antSteps[i]++     // Karıncanın adım sayısını arttır
+					antPositions[i]++ // Move the ant to the next node
+					antSteps[i]++     // Increment ant's step count
 				}
 
-				// Eğer karınca henüz yolunu tamamlamadıysa
+				// If the ant hasn't completed its path yet
 				if antPositions[i] < len(antPaths[i]) {
-					allAntsFinished = false // En az bir karınca hala hareket ediyor
+					allAntsFinished = false // At least one ant is still moving
 				}
 			} else {
-				allAntsFinished = false // Bu karınca diğerlerini bekliyor
+				allAntsFinished = false // This ant is waiting for others
 			}
 		}
 
-		// Her turun çıktısını yazdır
+		// Print the output for each round
 		if len(roundOutput) > 0 {
 			fmt.Println(strings.Join(roundOutput, " "))
 		}
 		round++
 
-		// Eğer tüm karıncalar bitiş düğümüne ulaştıysa döngüden çık
+		// Exit loop if all ants reached the end node
 		if allAntsFinished {
-			break // Tüm karıncalar yollarını tamamladı
+			break // All ants have completed their paths
 		}
 	}
 }
